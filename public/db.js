@@ -1,56 +1,46 @@
+import { openDB } from 'https://unpkg.com/idb?module';
+
 let db;
-const request = indexedDB.open("budget", 1);
 
-request.onupgradeneeded = function(event) {
-  const db = event.target.result;
-  db.createObjectStore("pending", { autoIncrement: true });
-};
+( async ()=> {
+  db = await openDB("budget", 1, {
+    upgrade(db) {
+      const objectStore = db.createObjectStore("pending", {
+        keyPath: "offlineId",
+        // If it isn't explicitly set, create a value by auto incrementing.
+        autoIncrement: true 
+        });
 
-request.onsuccess = function(event) {
-  db = event.target.result;
+      console.log( `~ created the db/upgraded it:`, objectStore.name );
+    } });
+})();
 
-  // check if app is online before reading from db
-  if (navigator.onLine) {
-    checkDatabase();
-  }
-};
+// Function only operates while offline. Saves new transactions offline until the browser goes back online
+async function saveOfflineRecord( newTransaction ) {
+  const trans = db.transaction("pending", "readwrite");
+  const pendingTable = trans.objectStore("pending");
+  pendingTable.add( newTransaction );
 
-request.onerror = function(event) {
-  console.log("Woops! " + event.target.errorCode);
-};
+  await trans.done;
 
-function saveRecord(record) {
-  const transaction = db.transaction(["pending"], "readwrite");
-  const store = transaction.objectStore("pending");
-
-  store.add(record);
+  console.log(`Saving new record offline: ` + JSON.stringify(newTransaction));
 }
 
-function checkDatabase() {
-  const transaction = db.transaction(["pending"], "readwrite");
-  const store = transaction.objectStore("pending");
-  const getAll = store.getAll();
+async function syncOfflineToServer() {
 
-  getAll.onsuccess = function() {
-    if (getAll.result.length > 0) {
-      fetch("/api/transaction/bulk", {
-        method: "POST",
-        body: JSON.stringify(getAll.result),
-        headers: {
-          Accept: "application/json, text/plain, */*",
-          "Content-Type": "application/json"
-        }
-      })
-      .then(response => response.json())
-        .then(() => {
-          // delete records if successful
-          const transaction = db.transaction(["pending"], "readwrite");
-          const store = transaction.objectStore("pending");
-          store.clear();
-        });
-    }
-  };
+}
+
+function browserOnline() {
+  console.log("Browser is online. Writing to database...");
+  syncOfflineToServer();
+}
+
+function browserOffline() {
+  console.log("Browser is offline. Saving locally...");
 }
 
 // listen for app coming back online
-window.addEventListener("online", checkDatabase);
+window.addEventListener("online", browserOnline);
+window.addEventListener("offline", browserOffline);
+
+export default saveOfflineRecord;
