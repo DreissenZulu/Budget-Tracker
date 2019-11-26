@@ -27,7 +27,35 @@ async function saveOfflineRecord( newTransaction ) {
 }
 
 async function syncOfflineToServer() {
+  // check if any pending transactions
+  // if yes: get them + /api/transaction/bulk call
 
+  const pendingList = await db.getAll("pending");
+  console.log( `pendingList: `, pendingList );
+
+  if( pendingList.length ){
+    // sync it to server
+    const response = await fetch("/api/transaction/bulk", {
+      method: "POST",
+      body: JSON.stringify(pendingList),
+      headers: {
+        Accept: "application/json, text/plain, */*",
+        "Content-Type": "application/json"
+      }
+    });
+    // tne response is actually a promise so we 'await' it too.
+    const responseData = await response.json();
+
+    console.log( `items accepted and sync'd by server:`, responseData.offlineIds );
+    // now in theory the server will verify it saved each of these posts,
+    
+    // if successful delete from indexDb
+    for( let id of responseData.offlineIds ){
+      // delete entry
+      console.log( `.. deleting pending transaction (sync ok): id=${id}`, id );
+      await db.delete("pending", id );
+    }
+  }
 }
 
 function browserOnline() {
