@@ -1,8 +1,12 @@
+import saveOfflineRecord from "./db.js";
+
 let transactions = [];
 let myChart;
 
 fetch("/api/transaction")
-  .then(response => response.json())
+  .then(response => {
+    return response.json()
+  })
   .then(data => {
     // save db data on global variable
     transactions = data;
@@ -77,7 +81,7 @@ function populateChart() {
   });
 }
 
-function sendTransaction(isAdding) {
+function sendFormTransaction( action ) {
   const nameEl = document.querySelector("#t-name");
   const amountEl = document.querySelector("#t-amount");
   const errorEl = document.querySelector(".form .error");
@@ -90,17 +94,12 @@ function sendTransaction(isAdding) {
     errorEl.textContent = "";
   }
 
-  // create record
+  // create record and ensure value is a number
   const transaction = {
     name: nameEl.value,
-    value: amountEl.value,
+    value: Number( action == 'subtract-value' ? -amountEl.value : amountEl.value ),
     date: new Date().toISOString()
   };
-
-  // if subtracting funds, convert amount to negative number
-  if (!isAdding) {
-    transaction.value *= -1;
-  }
 
   // add to beginning of current array of data
   transactions.unshift(transaction);
@@ -119,7 +118,9 @@ function sendTransaction(isAdding) {
       "Content-Type": "application/json"
     }
   })
-    .then(response => response.json())
+    .then(response => {
+      return response.json()
+    })
     .then(data => {
       if (data.errors) {
         errorEl.textContent = "Missing Information";
@@ -131,7 +132,7 @@ function sendTransaction(isAdding) {
     })
     .catch(err => {
       // fetch failed, so save in indexed db
-      saveRecord(transaction);
+      saveOfflineRecord(transaction);
 
       // clear form
       nameEl.value = "";
@@ -139,12 +140,12 @@ function sendTransaction(isAdding) {
     });
 }
 
-document.querySelector("#add-btn").addEventListener("click", function(event) {
+document.querySelector("#add-btn").onclick = function () {
   event.preventDefault();
-  sendTransaction(true);
-});
+  sendFormTransaction('add-value');
+};
 
-document.querySelector("#sub-btn").addEventListener("click", function(event) {
+document.querySelector("#sub-btn").onclick = function () {
   event.preventDefault();
-  sendTransaction(false);
-});
+  sendFormTransaction('subtract-value');
+};
