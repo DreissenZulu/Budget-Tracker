@@ -15,6 +15,10 @@ const transactionSchema = new Schema({
   date: {
     type: Date,
     default: Date.now
+  },
+  offlineId: {
+    type: Number,
+    default: 0
   }
 });
 
